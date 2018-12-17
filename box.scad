@@ -73,7 +73,7 @@ module CaptiveNutBox(
        };
     };
     
-    module CaptiveNutCylinder() {
+    module CaptiveNutCylinder(corner=true) {
         
         // Polygon is centered on origin, with "first" point along X axis
         module RegularPolygon(numCorners, outerRadius, faceOnXAxis=false) {
@@ -143,16 +143,26 @@ module CaptiveNutBox(
             union() {
                 // Cylinder exterior
                 linear_extrude(nutCylinderHeight)
-                    xyshape();
+                    xyshape(corner);
                 
                 // Bottom support (inverted cone)
-                coneUpperRadius = nutCylinderDiameter + (sqrt(2*nutCylinderDiameter*nutCylinderDiameter) - nutCylinderDiameter) / 2;
-                intersection() {
-                    translate([ -nutCylinderDiameter/2, -nutCylinderDiameter/2, -coneUpperRadius ])
-                        cylinder(r1=0, r2=coneUpperRadius, h=coneUpperRadius);
-                    linear_extrude(coneUpperRadius*3, center=true)
-                        xyshape();
-                };
+                if (corner) {
+                    coneUpperRadius = nutCylinderDiameter + (sqrt(2*nutCylinderDiameter*nutCylinderDiameter) - nutCylinderDiameter) / 2;
+                    intersection() {
+                        translate([ -nutCylinderDiameter/2, -nutCylinderDiameter/2, -coneUpperRadius ])
+                            cylinder(r1=0, r2=coneUpperRadius, h=coneUpperRadius);
+                        linear_extrude(coneUpperRadius*3, center=true)
+                            xyshape(corner);
+                    };
+                } else {
+                    coneUpperRadius = nutCylinderDiameter;
+                    intersection() {
+                        translate([ 0, -nutCylinderDiameter/2, -coneUpperRadius ])
+                            cylinder(r1=0, r2=coneUpperRadius, h=coneUpperRadius);
+                        linear_extrude(coneUpperRadius*3, center=true)
+                            xyshape(corner);
+                    };
+                }
             };
             
             // Nut cutout
@@ -190,6 +200,9 @@ module CaptiveNutBox(
                     rotate([ 0, 0, 180 ])
                         mirror([ 1, 0, 0 ])
                             CaptiveNutCylinder();
+                
+                //translate([ (nutHolderX1 + nutHolderX2) / 2, nutHolderY1, nutHolderZ ])
+                //    CaptiveNutCylinder(false);
             };
             
             // Nut removal holes
@@ -330,7 +343,7 @@ module CaptiveNutBox(
             };
 };
 
-CaptiveNutBox("both", [ 50, 60, 40 ], countersinkScrews = true) {
+CaptiveNutBox("both", [ 80, 60, 40 ], countersinkScrews = true) {
     // Top
     union() {
         square([ 5, 5 ]);
