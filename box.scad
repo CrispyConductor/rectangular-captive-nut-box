@@ -4,12 +4,12 @@ $fs=0.7;
 module CaptiveNutBox(
     part, // which part to produce, "box" or "lid"
     size, // interior dimensions of box
-    nutSize=8.731, // size of the nut, face to face
-    nutHeight=3.175, // height/thickness of the nut
+    nutSize=8.55, // size of the nut, face to face
+    nutHeight=3.1, // height/thickness of the nut
     screwHoleDiameter=4.5, // diameter of the hole for a free fit of the screw
     wallThick=2, // box wall thickness
     bottomThick=2, // box floor thickness
-    topThick=3, // thickness of box lid
+    topThick=3.3, // thickness of box lid
     nutWallThick=2, // thickness of walls and bottom around nuts
     nutTopWallThick=2.5, // thickness of wall above nut, which takes the screw pressure
     nutClearance=0.3, // clearance between nut and each surrounding wall
@@ -330,8 +330,7 @@ module CaptiveNutBox(
             };
 };
 
-CaptiveNutBox("both", [ 50, 60, 30 ], countersinkScrews = true) {
-    /*
+CaptiveNutBox("both", [ 50, 60, 40 ], countersinkScrews = true) {
     // Top
     union() {
         square([ 5, 5 ]);
@@ -381,5 +380,5 @@ CaptiveNutBox("both", [ 50, 60, 30 ], countersinkScrews = true) {
         text("Hi");
     translate([30, 20])
         text("Hi");
-    */
+
 };
