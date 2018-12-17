@@ -7,6 +7,7 @@ module CaptiveNutBox(
     nutSize=8.55, // size of the nut, face to face
     nutHeight=3.1, // height/thickness of the nut
     screwHoleDiameter=4.5, // diameter of the hole for a free fit of the screw
+    maxDistBetweenScrews = 100, // if corner screws are farther apart than this, add extra screws on the edges
     wallThick=2, // box wall thickness
     bottomThick=2, // box floor thickness
     topThick=3.3, // thickness of box lid
@@ -41,16 +42,48 @@ module CaptiveNutBox(
     // Height of the cylinder the nut fits inside
     nutCylinderHeight = nutCutoutHeight + nutWallThick + nutTopWallThick + hexConeHeight;
     
-    nutHolderX1 = wallThick+nutCylinderDiameter/2;
-    nutHolderX2 = wallThick + size[0] - nutCylinderDiameter/2;
-    nutHolderY1 = wallThick+nutCylinderDiameter/2;
-    nutHolderY2 = wallThick + size[1] - nutCylinderDiameter/2;
+    // Z position of the bottom of the nut holder cylinder
     nutHolderZ = outerSize[2] - nutCylinderHeight;
-    
+
     embossThick = min(maxEmbossThick, bottomThick/2, topThick/2, wallThick/2);
     
     minScrewLength = topThick + nutTopWallThick + nutCutoutHeight + hexConeHeight - (countersinkScrews ? countersinkDepth : 0);
     echo("Minimum screw length", minScrewLength);
+    
+    // Corner positions of nut holders
+    nutHolderPosCorners = [
+        // [ IsCorner, XPos, YPos, Rotate, Mirror, XAligned ]
+        [ true, wallThick+nutCylinderDiameter/2, wallThick+nutCylinderDiameter/2, undef, undef, false ],
+        [ true, wallThick + size[0] - nutCylinderDiameter/2, wallThick+nutCylinderDiameter/2, undef, [ 1, 0, 0 ], false ],
+        [ true, wallThick + size[0] - nutCylinderDiameter/2, wallThick + size[1] - nutCylinderDiameter/2, [ 0, 0, 180 ], undef, false ],
+        [ true, wallThick+nutCylinderDiameter/2, wallThick + size[1] - nutCylinderDiameter/2, [ 0, 0, 180 ], [ 1, 0, 0 ], false ]
+    ];
+    // X coordinates of non-corner nut holders along X axis
+    numNutHoldersWallX = max(0, ceil((size[0] - nutCylinderDiameter - maxDistBetweenScrews) / maxDistBetweenScrews));
+    nutHolderWallXSpacing = (numNutHoldersWallX > 0) ? ((size[0] - nutCylinderDiameter) / (numNutHoldersWallX + 1)) : 0;
+    nutHolderWallXCoords = numNutHoldersWallX < 1 ? [] : [ for (i = [1 : numNutHoldersWallX])
+        wallThick + nutCylinderDiameter/2 + i * nutHolderWallXSpacing
+    ];
+    nutHolderWallX1Pos = [ for (x = nutHolderWallXCoords)
+        [ false, x, wallThick+nutCylinderDiameter/2, undef, undef, false ]
+    ];
+    nutHolderWallX2Pos = [ for (x = nutHolderWallXCoords)
+        [ false, x, wallThick + size[1] - nutCylinderDiameter/2, undef, [ 0, 1, 0 ], false ]
+    ];
+    // Y coordinates of non-corner nut holders along Y axis
+    numNutHoldersWallY = max(0, ceil((size[1] - nutCylinderDiameter - maxDistBetweenScrews) / maxDistBetweenScrews));
+    nutHolderWallYSpacing = (numNutHoldersWallY > 0) ? ((size[1] - nutCylinderDiameter) / (numNutHoldersWallY + 1)) : 0;
+    nutHolderWallYCoords = numNutHoldersWallY < 1 ? [] : [ for (i = [1 : numNutHoldersWallY])
+        wallThick + nutCylinderDiameter/2 + i * nutHolderWallYSpacing
+    ];
+    nutHolderWallY1Pos = [ for (y = nutHolderWallYCoords)
+        [ false, wallThick + nutCylinderDiameter / 2, y, [ 0, 0, -90 ], undef, true ]
+    ];
+    nutHolderWallY2Pos = [ for (y = nutHolderWallYCoords)
+        [ false, wallThick + size[0] - nutCylinderDiameter/2, y, [ 0, 0, 90 ], [ 1, 0, 0 ], true ]
+    ];
+    
+    nutHolderPos = concat(nutHolderPosCorners, nutHolderWallX1Pos, nutHolderWallX2Pos, nutHolderWallY1Pos, nutHolderWallY2Pos);
     
     module RoundedCube(size, radius) {
        hull() {
@@ -177,6 +210,29 @@ module CaptiveNutBox(
         };
     };
     
+    module BoxNutHolders() {
+        module rotated(pos) {
+            if (pos[3] == undef)
+                mirrored(pos)
+                    children();
+            else
+                rotate(pos[3])
+                    mirrored(pos)
+                        children();
+        };
+        module mirrored(pos) {
+            if (pos[4] == undef)
+                children();
+            else
+                mirror(pos[4])
+                    children();
+        };
+        for (pos = nutHolderPos)
+            translate([ pos[1], pos[2] ])
+                rotated(pos)
+                    CaptiveNutCylinder(pos[0]);
+    };
+    
     module BoxBody() {
         difference() {
             union() {
@@ -187,31 +243,19 @@ module CaptiveNutBox(
                     translate([ wallThick, wallThick, bottomThick ])
                         cube([ size[0], size[1], size[2] + 10 ]);
                 };
-                // Nut holders
-                translate([ nutHolderX1, nutHolderY1, nutHolderZ ])
-                    CaptiveNutCylinder();
-                translate([ nutHolderX2, nutHolderY1, nutHolderZ ])
-                    mirror([ 1, 0, 0 ])
-                        CaptiveNutCylinder();
-                translate([ nutHolderX2, nutHolderY2, nutHolderZ ])
-                    rotate([ 0, 0, 180 ])
-                        CaptiveNutCylinder();
-                translate([ nutHolderX1, nutHolderY2, nutHolderZ ])
-                    rotate([ 0, 0, 180 ])
-                        mirror([ 1, 0, 0 ])
-                            CaptiveNutCylinder();
                 
-                //translate([ (nutHolderX1 + nutHolderX2) / 2, nutHolderY1, nutHolderZ ])
-                //    CaptiveNutCylinder(false);
+                // Nut holders
+                translate([ 0, 0, nutHolderZ ])
+                    BoxNutHolders();
             };
             
             // Nut removal holes
             nutRemovalHoleLength = (wallThick + nutCutoutMaxDiameter) * 2;
             nutRemovalHoleZ = nutHolderZ + nutWallThick + nutCutoutHeight/2;
             if (nutRemovalHoleDiameter > 0)
-                for (x = [ nutHolderX1, nutHolderX2 ])
-                    for (y = [ nutHolderY1, nutHolderY2 ])
-                        translate([ x, y, nutRemovalHoleZ ])
+                for (pos = nutHolderPos)
+                    translate([ pos[1], pos[2], nutRemovalHoleZ ])
+                        rotate(pos[3])
                             rotate([ 90, 0, 0 ])
                                 cylinder(r=nutRemovalHoleDiameter/2, h=nutRemovalHoleLength, center=true);
         };
@@ -290,15 +334,13 @@ module CaptiveNutBox(
         difference() {
             cube([ outerSize[0], outerSize[1], topThick ]);
             // Screw holes
-            for (x = [ nutHolderX1, nutHolderX2 ])
-                for (y = [ nutHolderY1, nutHolderY2 ])
-                    translate([ x, y, 0 ])
-                        cylinder(r=screwHoleDiameter/2, h=topThick*2);
+            for (pos = nutHolderPos)
+                translate([ pos[1], pos[2], 0 ])
+                    cylinder(r=screwHoleDiameter/2, h=topThick*2);
             // Countersinks
-            for (x = [ nutHolderX1, nutHolderX2 ])
-                for (y = [ nutHolderY1, nutHolderY2 ])
-                    translate([ x, y, max(topThick - countersinkDepth, 0.2) ])
-                        cylinder(r1=screwHoleDiameter/2, r2=countersinkTopDiameter/2, h=countersinkHeight);
+            for (pos = nutHolderPos)
+                translate([ pos[1], pos[2], max(topThick - countersinkDepth, 0.2) ])
+                    cylinder(r1=screwHoleDiameter/2, r2=countersinkTopDiameter/2, h=countersinkHeight);
             // Cutouts
             if ($children >= 1)
                 linear_extrude(topThick*2)
@@ -343,7 +385,7 @@ module CaptiveNutBox(
             };
 };
 
-CaptiveNutBox("both", [ 80, 60, 40 ], countersinkScrews = true) {
+CaptiveNutBox("both", [ 120, 120, 40 ], countersinkScrews = true) {
     // Top
     union() {
         square([ 5, 5 ]);
